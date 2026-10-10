@@ -9,8 +9,13 @@ class Config:
         'DATABASE_URL', 
         'postgresql+psycopg2://postgres:vignesh@localhost:5432/ticketing_db'
     )
-    if _db_url and _db_url.startswith('postgres://'):
-        _db_url = _db_url.replace('postgres://', 'postgresql://', 1)
+    # Normalize Render PostgreSQL URL to explicitly use the installed psycopg2 driver
+    if _db_url:
+        if _db_url.startswith('postgres://'):
+            _db_url = _db_url.replace('postgres://', 'postgresql+psycopg2://', 1)
+        elif _db_url.startswith('postgresql://') and not _db_url.startswith('postgresql+'):
+            _db_url = _db_url.replace('postgresql://', 'postgresql+psycopg2://', 1)
 
     SQLALCHEMY_DATABASE_URI = _db_url
+
     SQLALCHEMY_TRACK_MODIFICATIONS = False
