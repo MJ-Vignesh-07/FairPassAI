@@ -13,7 +13,7 @@ services:
   # 1. Backend Web Service (Flask + Gunicorn + Scikit-Learn Anti-Scalping Engine)
   - type: web
     name: fairpass-backend
-    env: python
+    runtime: python
     plan: free
     rootDir: smart-ticketing-backend/smart-ticketing-backend
     buildCommand: pip install -r requirements.txt
@@ -32,8 +32,9 @@ services:
         value: 3.11.9
 
   # 2. Frontend Static Site (React 19 / Vite SPA)
-  - type: static
+  - type: web
     name: fairpass-frontend
+    runtime: static
     rootDir: smart-ticketing-frontend
     buildCommand: npm install && npm run build
     staticPublishPath: dist
