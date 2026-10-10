@@ -1,0 +1,2 @@
+Genuine User: vignesh@example.com / password123 (Role: USER)
+Administrator: admin@fairpass.io / admin123 (Role: ADMIN)
