@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from app.extensions import db
@@ -22,16 +22,28 @@ def eval_risk():
     if not event_id or not tier_id:
         return jsonify({"error": "event_id and tier_id are required"}), 400
 
-    # Extract client IP and measure 60s request frequency
-    ip_address = request.headers.get('X-Forwarded-For', request.remote_addr) or "127.0.0.1"
+    # Extract client IP via access_route (supports Render & proxy forwarding)
+    if request.access_route:
+        ip_address = request.access_route[0]
+    else:
+        ip_address = request.remote_addr or "127.0.0.1"
+
     if ',' in ip_address:
         ip_address = ip_address.split(',')[0].strip()
 
-    one_minute_ago = datetime.utcnow() - timedelta(seconds=60)
-    ip_freq = BehaviorLog.query.filter(
-        BehaviorLog.ip_address == ip_address,
-        BehaviorLog.created_at >= one_minute_ago
-    ).count() + 1
+    one_minute_ago = datetime.now(timezone.utc) - timedelta(seconds=60)
+    try:
+        ip_freq = BehaviorLog.query.filter(
+            BehaviorLog.ip_address == ip_address,
+            BehaviorLog.created_at >= one_minute_ago
+        ).count() + 1
+    except Exception:
+        # Fallback for databases with naive UTC storage
+        ip_freq = BehaviorLog.query.filter(
+            BehaviorLog.ip_address == ip_address,
+            BehaviorLog.created_at >= (datetime.utcnow() - timedelta(seconds=60))
+        ).count() + 1
+
 
     feature_dict = {
         'tickets_requested': quantity,

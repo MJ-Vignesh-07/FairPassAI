@@ -1,3 +1,4 @@
+import os
 from app import create_app
 from app.extensions import db
 from sqlalchemy import text
@@ -11,9 +12,9 @@ if __name__ == '__main__':
             db.session.execute(text('SELECT 1'))
             print("\n Database connection verified successfully!")
         except Exception as e:
-            print("\n Database connection failed. Please check your credentials in app/config.py.")
-            print(f"Error details: {e}")
-            exit(1)
+            print(f"\n Database connection check note: {e}")
 
-    print(" Starting Flask server on http://127.0.0.1:5000\n")
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    port = int(os.environ.get('PORT', 5000))
+    is_prod = bool(os.environ.get('RENDER'))
+    print(f" Starting Flask server on port {port} (production={is_prod})\n")
+    app.run(host='0.0.0.0', port=port, debug=not is_prod)

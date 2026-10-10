@@ -7,12 +7,6 @@ export default function AuthPage({ currentUser, onAuthSuccess, backendStatus, in
   const navigate = useNavigate();
   const location = useLocation();
 
-  // If already authenticated with a valid session, redirect immediately to target or root
-  if (currentUser && getAuthToken()) {
-    const destination = location.state?.from?.pathname || '/';
-    return <Navigate to={destination} replace />;
-  }
-
   const defaultRole = location.state?.targetRole || 'USER';
 
   const [isRegister, setIsRegister] = useState(initialIsRegister);
@@ -27,6 +21,13 @@ export default function AuthPage({ currentUser, onAuthSuccess, backendStatus, in
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+
+  // If already authenticated with a valid session, redirect immediately to target or root
+  if (currentUser && getAuthToken()) {
+    const destination = location.state?.from?.pathname || '/';
+    return <Navigate to={destination} replace />;
+  }
+
 
   const handleTabSwitch = (registerMode) => {
     setIsRegister(registerMode);

@@ -1,6 +1,12 @@
-// API Client for Smart Ticketing Platform
+// Resolve backend base URL from environment (Render / production) with fallback to relative proxy
+let rawBackend = (import.meta.env.VITE_API_URL || '').trim();
+if (rawBackend && !rawBackend.startsWith('http://') && !rawBackend.startsWith('https://') && !rawBackend.startsWith('/')) {
+  rawBackend = `https://${rawBackend}`;
+}
+const BACKEND_URL = rawBackend.replace(/\/+$/, '');
+const API_BASE = `${BACKEND_URL}/api`;
 
-const API_BASE = '/api';
+
 
 /**
  * Helper to retrieve stored auth token
@@ -84,9 +90,10 @@ async function apiRequest(endpoint, options = {}) {
   } catch (err) {
     // If network error occurred, return a friendly message
     if (!err.status && err.name === 'TypeError') {
-      throw new Error('Backend server is currently offline or unreachable. Please ensure Flask is running on port 5000.');
+      throw new Error('Backend server is currently offline or unreachable. (Note: On Render free tier, the backend spins down after inactivity and takes ~30-50s to wake up).');
     }
     throw err;
+
   }
 }
 
@@ -170,9 +177,10 @@ export async function runBenchmarkApi(test_size = 1000) {
 
 export async function checkHealthApi() {
   try {
-    const res = await fetch('/health');
+    const res = await fetch(`${BACKEND_URL}/health`);
     return await res.json();
   } catch {
     return { status: 'offline' };
   }
 }
+

@@ -13,7 +13,12 @@ def create_app(config_class=Config):
     # Initialize extensions
     db.init_app(app)
     jwt.init_app(app)
-    cors.init_app(app)
+    cors.init_app(
+        app,
+        resources={r"/*": {"origins": "*"}},
+        allow_headers=["Content-Type", "Authorization", "X-Forwarded-For", "Accept"],
+        methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+    )
     
     # Register blueprints
     app.register_blueprint(auth_bp)
@@ -21,9 +26,32 @@ def create_app(config_class=Config):
     app.register_blueprint(tickets_bp)
     app.register_blueprint(admin_bp)
 
+    # Root status endpoint
+    @app.route('/')
+    def index():
+        return jsonify({
+            "service": "FairPass AI Backend",
+            "status": "online",
+            "version": "1.0.0",
+            "health": "/health"
+        }), 200
+
     # Simple root healthcheck route
     @app.route('/health')
     def health():
-        return jsonify({"status": "healthy", "database": "connected"}), 200
+        db_status = "connected"
+        try:
+            from sqlalchemy import text
+            db.session.execute(text('SELECT 1'))
+        except Exception:
+            db_status = "connecting_or_unavailable"
+        return jsonify({"status": "healthy", "database": db_status}), 200
 
-    return app
+    # Safe initial table creation
+    with app.app_context():
+        try:
+            db.create_all()
+        except Exception as e:
+            app.logger.warning(f"Initial db.create_all skipped or deferred: {e}")
+
+    return app
