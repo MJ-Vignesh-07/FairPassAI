@@ -44,7 +44,5 @@ services:
         destination: /index.html
     envVars:
       - key: VITE_API_URL
-        fromService:
-          type: web
-          name: fairpass-backend
-          property: host
+        value: https://fairpass-backend.onrender.com
+

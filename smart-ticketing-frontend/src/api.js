@@ -1,10 +1,38 @@
-// Resolve backend base URL from environment (Render / production) with fallback to relative proxy
-let rawBackend = (import.meta.env.VITE_API_URL || '').trim();
-if (rawBackend && !rawBackend.startsWith('http://') && !rawBackend.startsWith('https://') && !rawBackend.startsWith('/')) {
-  rawBackend = `https://${rawBackend}`;
-}
-const BACKEND_URL = rawBackend.replace(/\/+$/, '');
-const API_BASE = `${BACKEND_URL}/api`;
+// Resolve backend base URL with priority:
+// 1. User runtime override in localStorage (fairpass_custom_api_url)
+// 2. Build-time environment variable (VITE_API_URL)
+// 3. Render bare service name fallback (fairpass-backend -> fairpass-backend.onrender.com)
+// 4. Default to relative proxy ('')
+export const getBackendBase = () => {
+  const custom = typeof window !== 'undefined' ? localStorage.getItem('fairpass_custom_api_url') : null;
+  let raw = (custom || import.meta.env.VITE_API_URL || '').trim();
+
+  // If a bare hostname was provided like 'fairpass-backend' without dot, append .onrender.com
+  if (raw && !raw.includes('.') && !raw.includes('localhost') && !raw.includes('127.0.0.1')) {
+    raw = `${raw}.onrender.com`;
+  }
+
+  if (raw && !raw.startsWith('http://') && !raw.startsWith('https://') && !raw.startsWith('/')) {
+    raw = `https://${raw}`;
+  }
+
+  return raw.replace(/\/+$/, '');
+};
+
+export const getApiBase = () => `${getBackendBase()}/api`;
+
+export const setCustomApiUrl = (url) => {
+  if (url && url.trim()) {
+    localStorage.setItem('fairpass_custom_api_url', url.trim());
+  } else {
+    localStorage.removeItem('fairpass_custom_api_url');
+  }
+};
+
+export const getCustomApiUrl = () => {
+  return (typeof window !== 'undefined' ? localStorage.getItem('fairpass_custom_api_url') : '') || '';
+};
+
 
 
 
@@ -65,7 +93,8 @@ async function apiRequest(endpoint, options = {}) {
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const url = `${API_BASE}${endpoint}`;
+  const url = `${getApiBase()}${endpoint}`;
+
 
   try {
     const response = await fetch(url, {
@@ -177,10 +206,11 @@ export async function runBenchmarkApi(test_size = 1000) {
 
 export async function checkHealthApi() {
   try {
-    const res = await fetch(`${BACKEND_URL}/health`);
+    const res = await fetch(`${getBackendBase()}/health`);
     return await res.json();
   } catch {
     return { status: 'offline' };
   }
 }
+
 
