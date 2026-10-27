@@ -34,21 +34,21 @@ def evaluate_session_risk(features_dict):
     if risk_score < 0.35:
         tier = "LOW"
         rules = {
-            "max_cap": 4,
+            "max_cap": 10,
             "challenge_required": False,
             "queue_delay_seconds": 0
         }
     elif risk_score < 0.70:
         tier = "MEDIUM"
         rules = {
-            "max_cap": 2,
+            "max_cap": 5,
             "challenge_required": True,
             "queue_delay_seconds": 0
         }
     else:
         tier = "HIGH"
         rules = {
-            "max_cap": 1,
+            "max_cap": 2,
             "challenge_required": True,
             "queue_delay_seconds": 30
         }

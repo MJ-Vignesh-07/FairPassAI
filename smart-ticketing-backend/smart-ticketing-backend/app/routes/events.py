@@ -59,13 +59,16 @@ def create_event():
     db.session.flush()
 
     for tier_data in tiers:
+        name = tier_data.get('tier_name', '')
+        is_vip = any(kw in name.upper() for kw in ["VIP", "EXECUTIVE", "FRONT ROW", "BACKSTAGE", "LOUNGE"])
+        tier_default_cap = 5 if is_vip else 10
         tier = TicketTier(
             event_id=new_event.id,
-            tier_name=tier_data['tier_name'],
+            tier_name=name,
             price=tier_data['price'],
             total_quantity=tier_data['quantity'],
             available_quantity=tier_data['quantity'],
-            max_limit_per_user=tier_data.get('max_limit_per_user', 4)
+            max_limit_per_user=int(tier_data.get('max_limit_per_user') or tier_default_cap)
         )
         db.session.add(tier)
 

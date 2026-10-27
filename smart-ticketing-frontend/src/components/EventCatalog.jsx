@@ -1,9 +1,18 @@
-import React, { useState } from 'react';
-import { Search, Calendar, MapPin, Ticket, ShieldCheck, Plus, RefreshCw, AlertCircle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
+import { Search, Calendar, MapPin, Ticket, ShieldCheck, Plus, RefreshCw, AlertCircle, ShieldAlert, X } from 'lucide-react';
 
 export default function EventCatalog({ events, loading, onRefresh, onSelectEvent, onOpenCreateEvent, currentUser }) {
+  const location = useLocation();
+  const [deniedMessage, setDeniedMessage] = useState(location.state?.accessDeniedMessage || '');
   const [searchQuery, setSearchQuery] = useState('');
   const [filterAvailableOnly, setFilterAvailableOnly] = useState(false);
+
+  useEffect(() => {
+    if (location.state?.accessDeniedMessage) {
+      setDeniedMessage(location.state.accessDeniedMessage);
+    }
+  }, [location.state]);
 
   // Filter events
   const filteredEvents = events.filter((ev) => {
@@ -39,6 +48,47 @@ export default function EventCatalog({ events, loading, onRefresh, onSelectEvent
 
   return (
     <div className="catalog-wrapper">
+      {/* Access Denied Feedback Banner if redirected from restricted route */}
+      {deniedMessage && (
+        <div
+          className="security-denied-banner glass-panel"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '12px',
+            padding: '14px 20px',
+            marginBottom: '20px',
+            background: 'rgba(239, 68, 68, 0.12)',
+            border: '1px solid rgba(239, 68, 68, 0.4)',
+            borderRadius: '12px',
+            color: '#fca5a5'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <ShieldAlert size={20} style={{ color: '#ef4444', flexShrink: 0 }} />
+            <span style={{ fontSize: '0.95rem', fontWeight: 500 }}>{deniedMessage}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setDeniedMessage('')}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: '#fca5a5',
+              cursor: 'pointer',
+              padding: '4px',
+              display: 'flex',
+              alignItems: 'center',
+              lineHeight: 1
+            }}
+            title="Dismiss notification"
+          >
+            <X size={16} />
+          </button>
+        </div>
+      )}
+
       {/* Hero Banner with Anti-Scalping Value Prop */}
       <div className="hero-banner glass-panel">
         <div className="hero-content">

@@ -29,7 +29,7 @@ class TicketTier(db.Model):
     price = db.Column(db.Numeric(10, 2), nullable=False)
     total_quantity = db.Column(db.Integer, nullable=False)
     available_quantity = db.Column(db.Integer, nullable=False)
-    max_limit_per_user = db.Column(db.Integer, default=4)
+    max_limit_per_user = db.Column(db.Integer, default=10)
 
 class BehaviorLog(db.Model):
     __tablename__ = 'behavior_logs'
@@ -65,3 +65,7 @@ class Booking(db.Model):
     risk_tier = db.Column(db.String(10), nullable=False)
     status = db.Column(db.String(20), default='CONFIRMED')
     created_at = db.Column(db.DateTime(timezone=True), default=datetime.utcnow)
+
+    user = db.relationship('User', backref=db.backref('bookings', lazy=True))
+    event = db.relationship('Event', backref=db.backref('bookings', lazy=True))
+    ticket_tier = db.relationship('TicketTier', backref=db.backref('bookings', lazy=True))

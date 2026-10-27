@@ -5,6 +5,7 @@ import EventCatalog from './components/EventCatalog';
 import TelemetryLab from './components/TelemetryLab';
 import AdminDashboard from './components/AdminDashboard';
 import BookingModal from './components/BookingModal';
+import BookingHistory from './components/BookingHistory';
 import AuthPage from './components/AuthPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import { 
@@ -146,9 +147,30 @@ export default function App() {
       />
 
       <Route
-        path="/telemetry"
+        path="/my-bookings"
         element={
           <ProtectedRoute currentUser={currentUser}>
+            <div className="app-container">
+              <Navbar
+                currentUser={currentUser}
+                onLogout={handleLogout}
+                backendStatus={backendStatus}
+              />
+              <main className="main-content">
+                <BookingHistory
+                  currentUser={currentUser}
+                  onSelectEvent={(ev) => setSelectedEventForBooking(ev)}
+                />
+              </main>
+            </div>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/telemetry"
+        element={
+          <ProtectedRoute currentUser={currentUser} requiredRole="ADMIN" redirectTo="/">
             <div className="app-container">
               <Navbar
                 currentUser={currentUser}
@@ -169,7 +191,7 @@ export default function App() {
       <Route
         path="/admin"
         element={
-          <ProtectedRoute currentUser={currentUser}>
+          <ProtectedRoute currentUser={currentUser} requiredRole="ADMIN" redirectTo="/">
             <div className="app-container">
               <Navbar
                 currentUser={currentUser}

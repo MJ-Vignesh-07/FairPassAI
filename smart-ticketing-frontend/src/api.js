@@ -178,15 +178,61 @@ export async function evalRiskApi({ event_id, tier_id, quantity, session_id, tel
   });
 }
 
-export async function bookTicketApi({ tier_id, quantity, risk_tier }) {
+export async function bookTicketApi({ tier_id, quantity, risk_tier, session_id, telemetry }) {
   return await apiRequest('/tickets/book', {
     method: 'POST',
     body: JSON.stringify({
       tier_id,
       quantity,
-      risk_tier
+      risk_tier,
+      session_id,
+      telemetry
     })
   });
+}
+
+// ----------------- Booking History & Ticket PDF -----------------
+
+export async function getMyBookingsApi() {
+  return await apiRequest('/tickets/my-bookings', { method: 'GET' });
+}
+
+export async function getBookingDetailsApi(bookingId) {
+  return await apiRequest(`/tickets/bookings/${bookingId}`, { method: 'GET' });
+}
+
+export async function downloadTicketPdfApi(bookingId) {
+  const token = getAuthToken();
+  const headers = {};
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  const url = `${getApiBase()}/tickets/bookings/${bookingId}/pdf`;
+  const response = await fetch(url, { headers });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error || `Failed to download ticket PDF (${response.status})`);
+  }
+
+  const blob = await response.blob();
+  const blobUrl = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = blobUrl;
+  link.download = `FairPass_Ticket_${bookingId}.pdf`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(blobUrl);
+
+  return true;
+}
+
+// ----------------- Telemetry Data -----------------
+
+export async function getTelemetryDataApi() {
+  return await apiRequest('/tickets/telemetry', { method: 'GET' });
 }
 
 // ----------------- Admin Analytics & Benchmarking -----------------

@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Shield, Ticket, Activity, BarChart3, User, LogIn, LogOut, Lock } from 'lucide-react';
+import { Shield, Ticket, Activity, BarChart3, User, LogIn, LogOut, CalendarCheck } from 'lucide-react';
 
 export default function Navbar({ currentUser, onLogout, backendStatus }) {
   const navigate = useNavigate();
@@ -8,6 +8,7 @@ export default function Navbar({ currentUser, onLogout, backendStatus }) {
   const isAdmin = currentUser?.role === 'ADMIN';
 
   const isEventsActive = location.pathname === '/' || location.pathname === '/events';
+  const isBookingsActive = location.pathname.startsWith('/my-bookings');
   const isTelemetryActive = location.pathname.startsWith('/telemetry');
   const isAdminActive = location.pathname.startsWith('/admin');
 
@@ -54,21 +55,32 @@ export default function Navbar({ currentUser, onLogout, backendStatus }) {
           </button>
 
           <button
-            className={`nav-btn ${isTelemetryActive ? 'active' : ''}`}
-            onClick={() => navigate('/telemetry')}
+            className={`nav-btn ${isBookingsActive ? 'active' : ''}`}
+            onClick={() => navigate('/my-bookings')}
           >
-            <Activity size={18} />
-            <span>Telemetry Lab</span>
+            <CalendarCheck size={18} />
+            <span>My Bookings</span>
           </button>
 
-          <button
-            className={`nav-btn ${isAdminActive ? 'active' : ''}`}
-            onClick={() => navigate('/admin')}
-          >
-            <BarChart3 size={18} />
-            <span>Admin & Metrics</span>
-            {!isAdmin && <Lock size={12} style={{ opacity: 0.6, marginLeft: '2px' }} />}
-          </button>
+          {isAdmin && (
+            <button
+              className={`nav-btn ${isTelemetryActive ? 'active' : ''}`}
+              onClick={() => navigate('/telemetry')}
+            >
+              <Activity size={18} />
+              <span>Telemetry Lab</span>
+            </button>
+          )}
+
+          {isAdmin && (
+            <button
+              className={`nav-btn ${isAdminActive ? 'active' : ''}`}
+              onClick={() => navigate('/admin')}
+            >
+              <BarChart3 size={18} />
+              <span>Admin & Metrics</span>
+            </button>
+          )}
         </nav>
 
         {/* User Account Section (In-App Switch Removed) */}

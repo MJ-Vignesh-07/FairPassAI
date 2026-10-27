@@ -1,12 +1,27 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
-  X, Shield, AlertTriangle, CheckCircle, Clock, Zap, 
-  Bot, Lock, ArrowRight, RefreshCw, Sparkles, UserCheck, AlertCircle 
+  X, Shield, CheckCircle, Clock, 
+  Bot, Lock, ArrowRight, RefreshCw, AlertCircle,
+  Download, ExternalLink, Ticket, CheckCircle2
 } from 'lucide-react';
-import { evalRiskApi, bookTicketApi } from '../api';
+import { evalRiskApi, bookTicketApi, downloadTicketPdfApi } from '../api';
 import VerificationChallenge from './VerificationChallenge';
 
+// Dynamic booking limits: General Access / Normal / Standard = 10, VIP / VIP Front Row = 5
+export const getTierLimit = (tier) => {
+  if (!tier) return 10;
+  const name = (tier.tier_name || '').toUpperCase();
+  const isVip = /VIP|FRONT ROW|EXECUTIVE|BACKSTAGE|LOUNGE/.test(name);
+  if (isVip) {
+    return tier.max_limit_per_user ? Math.min(5, Number(tier.max_limit_per_user)) : 5;
+  }
+  return tier.max_limit_per_user ? Number(tier.max_limit_per_user) : 10;
+};
+
 export default function BookingModal({ event, onClose, currentUser, onBookingComplete }) {
+  const isAdmin = currentUser?.role === 'ADMIN';
+
   // Available tiers
   const tiers = event?.tiers || [];
   const [selectedTierId, setSelectedTierId] = useState(tiers[0]?.id || null);
@@ -15,7 +30,7 @@ export default function BookingModal({ event, onClose, currentUser, onBookingCom
   // Quantity state
   const [quantity, setQuantity] = useState(1);
 
-  // Bot Simulation Mode Toggle
+  // Bot Simulation Mode Toggle (Admin only)
   const [isBotMode, setIsBotMode] = useState(false);
 
   // Telemetry Metrics State
@@ -24,18 +39,24 @@ export default function BookingModal({ event, onClose, currentUser, onBookingCom
   const [failedAttempts, setFailedAttempts] = useState(0);
   const [sessionId] = useState(() => `sess_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`);
 
-  // Booking Flow Steps: 1: 'configure', 2: 'assessment', 3: 'success'
+  // Booking Flow Steps: 1: 'configure', 2: 'assessment' (Admin only), 3: 'success'
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
-  // Risk Assessment Results
+  // User Booking Confirmation Dialog State
+  const [showUserConfirmDialog, setShowUserConfirmDialog] = useState(false);
+
+  // Risk Assessment Results (Admin flow)
   const [riskAssessment, setRiskAssessment] = useState(null);
   const [isVerified, setIsVerified] = useState(false);
   const [queueCountdown, setQueueCountdown] = useState(0);
 
   // Confirmed Booking Details
   const [bookingConfirmation, setBookingConfirmation] = useState(null);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
+  const [pdfError, setPdfError] = useState('');
+  const navigate = useNavigate();
 
   // Track time spent on page
   useEffect(() => {
@@ -65,12 +86,28 @@ export default function BookingModal({ event, onClose, currentUser, onBookingCom
   const handleTierChange = (tierId) => {
     setSelectedTierId(tierId);
     setQuantity(1);
+    setErrorMsg('');
   };
 
   // Step 1: Submit Telemetry & Evaluate ML Risk
   const handleEvaluateRisk = async () => {
     if (!currentUser) {
       setErrorMsg('Please sign in before reserving tickets.');
+      return;
+    }
+
+    if (!selectedTier || selectedTier.available_quantity <= 0) {
+      setErrorMsg('Selected tier is sold out. Please choose an available tier.');
+      return;
+    }
+
+    const tierLimit = getTierLimit(selectedTier);
+    if (quantity <= 0 || quantity > tierLimit) {
+      setErrorMsg(`Quantity must be between 1 and ${tierLimit}.`);
+      return;
+    }
+    if (quantity > selectedTier.available_quantity) {
+      setErrorMsg(`Only ${selectedTier.available_quantity} ticket(s) remaining for ${selectedTier.tier_name}.`);
       return;
     }
 
@@ -102,7 +139,7 @@ export default function BookingModal({ event, onClose, currentUser, onBookingCom
       setRiskAssessment(assessmentData);
 
       // Check max cap enforced by rule engine
-      const enforcedCap = assessmentData.rules?.max_cap || 4;
+      const enforcedCap = assessmentData.rules?.max_cap || tierLimit;
       if (quantity > enforcedCap) {
         setQuantity(enforcedCap);
       }
@@ -123,7 +160,7 @@ export default function BookingModal({ event, onClose, currentUser, onBookingCom
     }
   };
 
-  // Step 2: Execute Pessimistic Locked Reservation
+  // Step 2: Execute Pessimistic Locked Reservation (Admin Flow)
   const handleConfirmReservation = async () => {
     setLoading(true);
     setErrorMsg('');
@@ -132,7 +169,8 @@ export default function BookingModal({ event, onClose, currentUser, onBookingCom
       const confirmation = await bookTicketApi({
         tier_id: selectedTier.id,
         quantity: Number(quantity),
-        risk_tier: riskAssessment.risk_tier
+        risk_tier: riskAssessment.risk_tier,
+        session_id: sessionId
       });
 
       setBookingConfirmation(confirmation);
@@ -148,13 +186,91 @@ export default function BookingModal({ event, onClose, currentUser, onBookingCom
     }
   };
 
+  // USER Flow: Initiate Booking & Open Summary Confirmation Dialog
+  const handleInitiateUserBooking = () => {
+    if (!currentUser) {
+      setErrorMsg('Please sign in before reserving tickets.');
+      return;
+    }
+    if (!selectedTier || selectedTier.available_quantity <= 0) {
+      setErrorMsg('Selected tier is sold out. Please choose an available tier.');
+      return;
+    }
+    const tierLimit = getTierLimit(selectedTier);
+    if (quantity <= 0 || quantity > tierLimit) {
+      setErrorMsg(`Quantity must be between 1 and ${tierLimit}.`);
+      return;
+    }
+    if (quantity > selectedTier.available_quantity) {
+      setErrorMsg(`Only ${selectedTier.available_quantity} ticket(s) remaining for ${selectedTier.tier_name}.`);
+      return;
+    }
+    setErrorMsg('');
+    setShowUserConfirmDialog(true);
+  };
+
+  // USER Flow: Submit Final Confirmation Directly to Backend
+  const handleUserConfirmReservation = async () => {
+    if (!currentUser) {
+      setErrorMsg('Please sign in before reserving tickets.');
+      return;
+    }
+    setLoading(true);
+    setErrorMsg('');
+
+    const now = Date.now();
+    const actualInterval = now - mountTime;
+    const timeSpent = Math.max(timeSpentSeconds, 2);
+
+    try {
+      const confirmation = await bookTicketApi({
+        tier_id: selectedTier.id,
+        quantity: Number(quantity),
+        session_id: sessionId,
+        telemetry: {
+          request_interval_ms: actualInterval,
+          time_spent_seconds: timeSpent,
+          failed_attempts: failedAttempts
+        }
+      });
+
+      setBookingConfirmation(confirmation);
+      setShowUserConfirmDialog(false);
+      setStep(3); // Direct transition to confirmation & ticket PDF view!
+      if (onBookingComplete) {
+        onBookingComplete();
+      }
+    } catch (err) {
+      setFailedAttempts(prev => prev + 1);
+      setErrorMsg(err.message || 'Booking reservation failed. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Step 3: Handle PDF Download
+  const handleDownloadPdf = async () => {
+    if (!bookingConfirmation?.booking_id) return;
+    setDownloadingPdf(true);
+    setPdfError('');
+    try {
+      await downloadTicketPdfApi(bookingConfirmation.booking_id);
+    } catch (err) {
+      setPdfError(err.message || 'Failed to download ticket PDF');
+    } finally {
+      setDownloadingPdf(false);
+    }
+  };
+
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content glass-panel" onClick={(e) => e.stopPropagation()}>
         {/* Modal Header */}
         <div className="modal-header">
           <div className="modal-title-group">
-            <h2 className="modal-title">Ticket Allocation Engine</h2>
+            <h2 className="modal-title">
+              {isAdmin ? 'Ticket Allocation Engine' : 'Book Tickets'}
+            </h2>
             <div className="modal-subtitle">
               Event: <span className="highlight-text">{event.title}</span>
             </div>
@@ -174,51 +290,53 @@ export default function BookingModal({ event, onClose, currentUser, onBookingCom
         {/* STEP 1: CONFIGURE & TELEMETRY COLLECTOR */}
         {step === 1 && (
           <div className="booking-step-content">
-            {/* Live Telemetry Sensor HUD */}
-            <div className="telemetry-hud-card">
-              <div className="hud-header">
-                <div className="hud-title">
-                  <ActivityIndicator />
-                  <span>Real-Time Behavioral Telemetry Collector</span>
+            {/* Live Telemetry Sensor HUD (Strictly for ADMIN accounts) */}
+            {isAdmin && (
+              <div className="telemetry-hud-card">
+                <div className="hud-header">
+                  <div className="hud-title">
+                    <ActivityIndicator />
+                    <span>Real-Time Behavioral Telemetry Collector</span>
+                  </div>
+                  <button
+                    type="button"
+                    className={`btn-toggle-bot ${isBotMode ? 'active' : ''}`}
+                    onClick={() => setIsBotMode(!isBotMode)}
+                    title="Simulate automated bot script behavior to test high risk detection"
+                  >
+                    <Bot size={15} />
+                    <span>{isBotMode ? 'Bot Mode (Active)' : 'Simulate Bot Script'}</span>
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  className={`btn-toggle-bot ${isBotMode ? 'active' : ''}`}
-                  onClick={() => setIsBotMode(!isBotMode)}
-                  title="Simulate automated bot script behavior to test high risk detection"
-                >
-                  <Bot size={15} />
-                  <span>{isBotMode ? 'Bot Mode (Active)' : 'Simulate Bot Script'}</span>
-                </button>
-              </div>
 
-              <div className="hud-grid">
-                <div className="hud-item">
-                  <span className="hud-label">Dwell Time</span>
-                  <span className="hud-value font-mono">
-                    {isBotMode ? '1s (Automated)' : `${timeSpentSeconds}s`}
-                  </span>
-                </div>
-                <div className="hud-item">
-                  <span className="hud-label">Est. Click Latency</span>
-                  <span className="hud-value font-mono">
-                    {isBotMode ? '~85ms' : `${Date.now() - mountTime}ms`}
-                  </span>
-                </div>
-                <div className="hud-item">
-                  <span className="hud-label">Retry Frequency</span>
-                  <span className="hud-value font-mono">
-                    {isBotMode ? '3 rejects' : `${failedAttempts} rejects`}
-                  </span>
-                </div>
-                <div className="hud-item">
-                  <span className="hud-label">Session ID</span>
-                  <span className="hud-value font-mono truncate" title={sessionId}>
-                    {sessionId.substring(0, 14)}...
-                  </span>
+                <div className="hud-grid">
+                  <div className="hud-item">
+                    <span className="hud-label">Dwell Time</span>
+                    <span className="hud-value font-mono">
+                      {isBotMode ? '1s (Automated)' : `${timeSpentSeconds}s`}
+                    </span>
+                  </div>
+                  <div className="hud-item">
+                    <span className="hud-label">Est. Click Latency</span>
+                    <span className="hud-value font-mono">
+                      {isBotMode ? '~85ms' : `${Date.now() - mountTime}ms`}
+                    </span>
+                  </div>
+                  <div className="hud-item">
+                    <span className="hud-label">Retry Frequency</span>
+                    <span className="hud-value font-mono">
+                      {isBotMode ? '3 rejects' : `${failedAttempts} rejects`}
+                    </span>
+                  </div>
+                  <div className="hud-item">
+                    <span className="hud-label">Session ID</span>
+                    <span className="hud-value font-mono truncate" title={sessionId}>
+                      {sessionId.substring(0, 14)}...
+                    </span>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
 
             {/* Tier Selection */}
             <div className="form-section">
@@ -241,7 +359,7 @@ export default function BookingModal({ event, onClose, currentUser, onBookingCom
                         <span className="inventory-pill">
                           {isAvailable ? `${t.available_quantity} remaining` : 'Sold Out'}
                         </span>
-                        <span className="max-cap-pill">Max limit: {t.max_limit_per_user}</span>
+                        <span className="max-cap-pill">Max limit: {getTierLimit(t)}</span>
                       </div>
                     </div>
                   );
@@ -253,7 +371,9 @@ export default function BookingModal({ event, onClose, currentUser, onBookingCom
             <div className="form-section">
               <div className="quantity-header">
                 <label className="section-label">Number of Tickets</label>
-                <span className="quantity-subtext">Subject to dynamic behavioral risk verification</span>
+                <span className="quantity-subtext">
+                  {isAdmin ? 'Subject to dynamic behavioral risk verification' : 'Instant secure reservation'}
+                </span>
               </div>
               <div className="quantity-control-wrapper">
                 <button
@@ -268,8 +388,16 @@ export default function BookingModal({ event, onClose, currentUser, onBookingCom
                 <button
                   type="button"
                   className="btn-qty"
-                  onClick={() => setQuantity(Math.min(selectedTier?.max_limit_per_user || 4, quantity + 1))}
-                  disabled={quantity >= (selectedTier?.max_limit_per_user || 4)}
+                  onClick={() => {
+                    const tierLimit = getTierLimit(selectedTier);
+                    const avail = selectedTier?.available_quantity || 0;
+                    const maxAllowed = Math.min(tierLimit, avail > 0 ? avail : tierLimit);
+                    setQuantity(Math.min(maxAllowed, quantity + 1));
+                  }}
+                  disabled={
+                    quantity >= Math.min(getTierLimit(selectedTier), selectedTier?.available_quantity || 0) ||
+                    (selectedTier?.available_quantity || 0) <= 0
+                  }
                 >
                   +
                 </button>
@@ -281,38 +409,143 @@ export default function BookingModal({ event, onClose, currentUser, onBookingCom
                   </span>
                 </div>
               </div>
+              {selectedTier && selectedTier.available_quantity > 0 && selectedTier.available_quantity < getTierLimit(selectedTier) && (
+                <div className="inventory-limited-warning" style={{ fontSize: '0.8rem', color: '#f59e0b', marginTop: '6px' }}>
+                  ⚠ Capped at {selectedTier.available_quantity} ticket(s) remaining in inventory.
+                </div>
+              )}
             </div>
 
             {/* Modal Actions */}
             <div className="modal-actions">
-              <button type="button" className="btn btn-secondary" onClick={onClose}>
+              <button type="button" className="btn btn-secondary" onClick={onClose} disabled={loading}>
                 Cancel
               </button>
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={handleEvaluateRisk}
-                disabled={loading || !selectedTier || selectedTier.available_quantity <= 0}
-              >
-                {loading ? (
-                  <>
-                    <RefreshCw className="spin" size={16} />
-                    <span>Evaluating ML Risk...</span>
-                  </>
-                ) : (
-                  <>
-                    <Shield size={16} />
-                    <span>Evaluate Risk & Proceed</span>
-                    <ArrowRight size={16} />
-                  </>
-                )}
-              </button>
+              {isAdmin ? (
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={handleEvaluateRisk}
+                  disabled={loading || !selectedTier || selectedTier.available_quantity <= 0}
+                >
+                  {loading ? (
+                    <>
+                      <RefreshCw className="spin" size={16} />
+                      <span>Evaluating ML Risk...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Shield size={16} />
+                      <span>Evaluate Risk & Proceed</span>
+                      <ArrowRight size={16} />
+                    </>
+                  )}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={handleInitiateUserBooking}
+                  disabled={loading || !selectedTier || selectedTier.available_quantity <= 0}
+                >
+                  <CheckCircle2 size={16} />
+                  <span>Confirm Booking</span>
+                </button>
+              )}
             </div>
+
+            {/* USER Booking Confirmation Summary Dialog */}
+            {!isAdmin && showUserConfirmDialog && (
+              <div className="confirm-dialog-backdrop">
+                <div className="confirm-dialog-card glass-panel">
+                  <div className="confirm-dialog-header">
+                    <div className="confirm-dialog-badge">
+                      <Ticket size={15} />
+                      <span>Review Booking Details</span>
+                    </div>
+                    <h3 className="confirm-dialog-title">Confirm Ticket Reservation</h3>
+                    <p className="confirm-dialog-subtitle">
+                      Please review your ticket selection before finalizing the reservation.
+                    </p>
+                  </div>
+
+                  <div className="confirm-summary-list">
+                    <div className="confirm-summary-row">
+                      <span className="summary-label">Event</span>
+                      <span className="summary-value font-bold">{event.title}</span>
+                    </div>
+                    <div className="confirm-summary-row">
+                      <span className="summary-label">Venue</span>
+                      <span className="summary-value">{event.venue}</span>
+                    </div>
+                    <div className="confirm-summary-row">
+                      <span className="summary-label">Ticket Tier</span>
+                      <span className="summary-value highlight-tier">{selectedTier?.tier_name}</span>
+                    </div>
+                    <div className="confirm-summary-row">
+                      <span className="summary-label">Quantity</span>
+                      <span className="summary-value font-mono">
+                        {quantity} ticket{quantity > 1 ? 's' : ''}
+                      </span>
+                    </div>
+                    <div className="confirm-summary-row">
+                      <span className="summary-label">Price per Ticket</span>
+                      <span className="summary-value font-mono">
+                        ${Number(selectedTier?.price || 0).toFixed(2)}
+                      </span>
+                    </div>
+                    <div className="confirm-summary-divider" />
+                    <div className="confirm-summary-row total-row">
+                      <span className="summary-label font-bold">Total Amount</span>
+                      <span className="summary-value font-mono total-price">
+                        ${(Number(selectedTier?.price || 0) * quantity).toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+
+                  {errorMsg && (
+                    <div className="alert-banner alert-error" style={{ margin: '8px 0 0' }}>
+                      <AlertCircle size={16} />
+                      <span>{errorMsg}</span>
+                    </div>
+                  )}
+
+                  <div className="confirm-dialog-actions">
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={() => setShowUserConfirmDialog(false)}
+                      disabled={loading}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      onClick={handleUserConfirmReservation}
+                      disabled={loading}
+                    >
+                      {loading ? (
+                        <>
+                          <RefreshCw className="spin" size={16} />
+                          <span>Reserving Tickets...</span>
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle size={16} />
+                          <span>Confirm Reservation</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
-        {/* STEP 2: ML RISK ASSESSMENT & TIERED PROTOCOL */}
-        {step === 2 && riskAssessment && (
+        {/* STEP 2: ML RISK ASSESSMENT & TIERED PROTOCOL (ADMIN ONLY) */}
+        {step === 2 && riskAssessment && isAdmin && (
           <div className="booking-step-content">
             {/* Risk Assessment Score Card */}
             <div className={`risk-result-card border-${riskAssessment.risk_tier.toLowerCase()}`}>
@@ -468,8 +701,50 @@ export default function BookingModal({ event, onClose, currentUser, onBookingCom
               </div>
             </div>
 
-            <div className="modal-actions" style={{ justifyContent: 'center', marginTop: '24px' }}>
-              <button type="button" className="btn btn-primary" onClick={onClose}>
+            {pdfError && (
+              <div className="alert-banner alert-error" style={{ marginTop: '16px' }}>
+                <AlertCircle size={16} />
+                <span>{pdfError}</span>
+              </div>
+            )}
+
+            <div className="modal-actions" style={{ justifyContent: 'center', marginTop: '24px', flexWrap: 'wrap', gap: '12px' }}>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={handleDownloadPdf}
+                disabled={downloadingPdf}
+                style={{
+                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                  boxShadow: '0 4px 16px rgba(16, 185, 129, 0.4)'
+                }}
+              >
+                {downloadingPdf ? (
+                  <>
+                    <RefreshCw className="spin" size={16} />
+                    <span>Generating PDF...</span>
+                  </>
+                ) : (
+                  <>
+                    <Download size={16} />
+                    <span>Download Ticket PDF</span>
+                  </>
+                )}
+              </button>
+
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => {
+                  onClose();
+                  navigate('/my-bookings');
+                }}
+              >
+                <ExternalLink size={15} />
+                <span>View in My Bookings</span>
+              </button>
+
+              <button type="button" className="btn btn-secondary" onClick={onClose}>
                 Done & Close
               </button>
             </div>

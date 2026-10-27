@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Navigate } from 'react-router-dom';
 import { 
   BarChart3, ShieldAlert, Users, Ticket, Activity, 
   Play, RefreshCw, Plus, CheckCircle2, AlertTriangle, ShieldCheck, Database, LogOut 
@@ -21,8 +22,8 @@ export default function AdminDashboard({ currentUser, onLogoutAndAuthAdmin, onOp
     date: '2026-11-20T19:00:00',
     description: '',
     tiers: [
-      { tier_name: 'General Access', price: 50.00, quantity: 100, max_limit_per_user: 4 },
-      { tier_name: 'VIP Front Row', price: 120.00, quantity: 30, max_limit_per_user: 2 }
+      { tier_name: 'General Access', price: 50.00, quantity: 100, max_limit_per_user: 10 },
+      { tier_name: 'VIP Front Row', price: 120.00, quantity: 30, max_limit_per_user: 5 }
     ]
   });
   const [publishingEvent, setPublishingEvent] = useState(false);
@@ -68,7 +69,7 @@ export default function AdminDashboard({ currentUser, onLogoutAndAuthAdmin, onOp
   const handleAddTier = () => {
     setEventForm(prev => ({
       ...prev,
-      tiers: [...prev.tiers, { tier_name: '', price: 40.00, quantity: 50, max_limit_per_user: 4 }]
+      tiers: [...prev.tiers, { tier_name: '', price: 40.00, quantity: 50, max_limit_per_user: 10 }]
     }));
   };
 
@@ -111,40 +112,13 @@ export default function AdminDashboard({ currentUser, onLogoutAndAuthAdmin, onOp
 
   if (!isAdmin) {
     return (
-      <div className="admin-locked-container glass-panel">
-        <ShieldAlert size={48} className="text-warning" />
-        <h2>Admin Authentication Required</h2>
-        <p>
-          {currentUser ? (
-            <>
-              You are currently signed in as <strong>{currentUser.username}</strong> with <strong>{currentUser.role}</strong> permissions. 
-              The administrative control center, PostgreSQL telemetry metrics, ML benchmark suite, and event publishing tools are restricted strictly to Administrators.
-            </>
-          ) : (
-            <>
-              You are currently not signed in. Access to live telemetry metrics, benchmark simulations, and event publishing requires Administrator authentication.
-            </>
-          )}
-        </p>
-
-        <div className="security-enforcement-pill">
-          <span>🔒 In-app role switching is disabled. Changing roles requires session termination.</span>
-        </div>
-
-        <div style={{ marginTop: '16px', display: 'flex', gap: '12px', flexWrap: 'wrap', justifyContent: 'center' }}>
-          {currentUser ? (
-            <button className="btn btn-primary" onClick={onLogoutAndAuthAdmin}>
-              <LogOut size={16} />
-              <span>Log Out & Sign In as Admin</span>
-            </button>
-          ) : (
-            <button className="btn btn-primary" onClick={() => onOpenAuth('ADMIN')}>
-              <ShieldCheck size={16} />
-              <span>Sign In as Admin</span>
-            </button>
-          )}
-        </div>
-      </div>
+      <Navigate
+        to="/"
+        replace
+        state={{
+          accessDeniedMessage: 'Access Denied: Administrator privileges are required to access Admin Metrics.'
+        }}
+      />
     );
   }
 

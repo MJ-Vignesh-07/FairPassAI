@@ -60,9 +60,9 @@ def bootstrap_database():
                     "venue": "DY Patil Stadium, Mumbai",
                     "event_date": datetime(2026, 11, 20, 19, 30),
                     "tiers": [
-                        {"name": "VIP Lounge", "price": 350.00, "qty": 100, "limit": 2},
-                        {"name": "Floor Standing", "price": 120.00, "qty": 500, "limit": 4},
-                        {"name": "General Bleachers", "price": 60.00, "qty": 1200, "limit": 4}
+                        {"name": "VIP Lounge", "price": 350.00, "qty": 100, "limit": 5},
+                        {"name": "Floor Standing", "price": 120.00, "qty": 500, "limit": 10},
+                        {"name": "General Bleachers", "price": 60.00, "qty": 1200, "limit": 10}
                     ]
                 },
                 {
@@ -71,8 +71,8 @@ def bootstrap_database():
                     "venue": "Convention Center, Hall A",
                     "event_date": datetime(2026, 12, 5, 9, 0),
                     "tiers": [
-                        {"name": "Executive Pass", "price": 299.00, "qty": 150, "limit": 2},
-                        {"name": "Standard Admission", "price": 99.00, "qty": 450, "limit": 4}
+                        {"name": "Executive Pass", "price": 299.00, "qty": 150, "limit": 5},
+                        {"name": "Standard Admission", "price": 99.00, "qty": 450, "limit": 10}
                     ]
                 },
                 {
@@ -81,8 +81,8 @@ def bootstrap_database():
                     "venue": "Solar Arena Open Air",
                     "event_date": datetime(2026, 12, 31, 21, 0),
                     "tiers": [
-                        {"name": "Early Bird", "price": 85.00, "qty": 300, "limit": 4},
-                        {"name": "VIP Deck", "price": 250.00, "qty": 75, "limit": 2}
+                        {"name": "Early Bird", "price": 85.00, "qty": 300, "limit": 10},
+                        {"name": "VIP Deck", "price": 250.00, "qty": 75, "limit": 5}
                     ]
                 }
             ]
