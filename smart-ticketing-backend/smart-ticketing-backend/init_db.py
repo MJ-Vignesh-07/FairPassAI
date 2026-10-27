@@ -113,6 +113,20 @@ def bootstrap_database():
         else:
             print("[EVENTS] Events already present in database.")
 
+        # 3. Synchronize existing tiers with updated maximum booking limits (10 for Standard / 5 for VIP)
+        all_tiers = TicketTier.query.all()
+        tiers_updated = 0
+        for t in all_tiers:
+            name_upper = (t.tier_name or "").upper()
+            is_vip = any(kw in name_upper for kw in ["VIP", "EXECUTIVE", "FRONT ROW", "BACKSTAGE", "LOUNGE"])
+            target_limit = 5 if is_vip else 10
+            if t.max_limit_per_user != target_limit:
+                t.max_limit_per_user = target_limit
+                tiers_updated += 1
+        if tiers_updated > 0:
+            db.session.commit()
+            print(f"[TIERS] Synchronized {tiers_updated} tier(s) to updated limits (10 Standard / 5 VIP).")
+
         print("[SUCCESS] Database bootstrapping completed successfully!\n")
 
 if __name__ == '__main__':
