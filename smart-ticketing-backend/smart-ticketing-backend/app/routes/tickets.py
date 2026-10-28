@@ -65,7 +65,7 @@ def eval_risk():
         'request_interval_ms': int(telemetry.get('request_interval_ms', 3000)),
         'time_spent_seconds': int(telemetry.get('time_spent_seconds', 30)),
         'failed_attempts': int(telemetry.get('failed_attempts', 0)),
-        'ip_request_frequency': ip_freq
+        'ip_request_frequency': int(telemetry.get('ip_request_frequency')) if telemetry.get('ip_request_frequency') is not None else ip_freq
     }
 
     # Evaluate dynamic risk score

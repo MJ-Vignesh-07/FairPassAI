@@ -26,6 +26,7 @@ export default function TelemetryLab({ events: propEvents = [], currentUser }) {
   const [requestIntervalMs, setRequestIntervalMs] = useState(3800);
   const [timeSpentSeconds, setTimeSpentSeconds] = useState(25);
   const [failedAttempts, setFailedAttempts] = useState(0);
+  const [ipRequestFrequency, setIpRequestFrequency] = useState(1);
 
   const [selectedEventId, setSelectedEventId] = useState(localEvents[0]?.id || 1);
   const [inferenceResult, setInferenceResult] = useState(null);
@@ -95,16 +96,19 @@ export default function TelemetryLab({ events: propEvents = [], currentUser }) {
       setRequestIntervalMs(4200);
       setTimeSpentSeconds(32);
       setFailedAttempts(0);
+      setIpRequestFrequency(1);
     } else if (type === 'IMPATIENT') {
       setTicketsRequested(3);
       setRequestIntervalMs(850);
       setTimeSpentSeconds(6);
       setFailedAttempts(1);
+      setIpRequestFrequency(2);
     } else if (type === 'SCALPER_BOT') {
       setTicketsRequested(4);
       setRequestIntervalMs(90);
       setTimeSpentSeconds(1);
       setFailedAttempts(3);
+      setIpRequestFrequency(15);
     }
   };
 
@@ -130,7 +134,8 @@ export default function TelemetryLab({ events: propEvents = [], currentUser }) {
         telemetry: {
           request_interval_ms: Number(requestIntervalMs),
           time_spent_seconds: Number(timeSpentSeconds),
-          failed_attempts: Number(failedAttempts)
+          failed_attempts: Number(failedAttempts),
+          ip_request_frequency: Number(ipRequestFrequency)
         }
       });
 
@@ -605,6 +610,24 @@ export default function TelemetryLab({ events: propEvents = [], currentUser }) {
                     className="range-input"
                   />
                   <div className="slider-subtext">Repeated rapid failure or canceled booking count in session</div>
+                </div>
+
+                {/* 5. IP Request Frequency */}
+                <div className="slider-group">
+                  <div className="slider-label-row">
+                    <span className="slider-name">ip_request_frequency</span>
+                    <span className="slider-value font-mono">{ipRequestFrequency} req/min</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="1"
+                    max="30"
+                    step="1"
+                    value={ipRequestFrequency}
+                    onChange={(e) => setIpRequestFrequency(Number(e.target.value))}
+                    className="range-input"
+                  />
+                  <div className="slider-subtext">Requests from same client IP in rolling 60s window (Bots: &gt;8 req/min)</div>
                 </div>
 
                 {/* Target Event Selector (safe fallback) */}
